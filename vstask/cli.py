@@ -65,3 +65,25 @@ register(
     action='store_true',
     help='bash tab-completion; usage: source <(vstask --completion)',
 )
+
+
+class InputVarsAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        d = getattr(namespace, self.dest, None) or {}
+        for item in values:
+            if '=' not in item:
+                parser.error(f'--input values must be in KEY=VALUE format, got: {item!r}')
+            key, _, value = item.partition('=')
+            d[key] = value
+        setattr(namespace, self.dest, d)
+
+
+register(
+    '-i', '--input',
+    dest='input_vars',
+    nargs='+',
+    metavar='KEY=VALUE',
+    action=InputVarsAction,
+    default={},
+    help='set input variables for the task, e.g. -i buildConfig=Debug buildVariant=CRC_32',
+)

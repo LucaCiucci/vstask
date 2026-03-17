@@ -45,19 +45,42 @@ def get_tasks():
     }
 
 
-def run_task(task, root='.'):
+def resolve_variables(s, root, input_vars=None):
+    """Substitute VS Code variables in a string."""
+    s = s.replace('${workspaceFolder}', root)
+    s = s.replace('${workspaceFolderBasename}', os.path.basename(root))
+    s = s.replace('${cwd}', os.getcwd())
+    if input_vars:
+        for key, value in input_vars.items():
+            s = s.replace('${input:' + key + '}', value)
+    return s
+
+
+def run_task(task, root='.', input_vars=None):
     options = task.get('options', {})
-    cmd = task['command']
+    cmd = resolve_variables(task['command'], root, input_vars)
     if 'args' in task:
-        cmd = shlex.join([cmd, *task.get('args', [])])
+        cmd = shlex.join([
+            cmd,
+            *[resolve_variables(a, root, input_vars) for a in task.get('args', [])]
+        ])
     print(f'> {cmd}')
     cwd = root
     if 'cwd' in options:
-        cwd = os.path.join(root, options['cwd'])
+        resolved_cwd = resolve_variables(options['cwd'], root, input_vars)
+        cwd = resolved_cwd if os.path.isabs(resolved_cwd) else os.path.join(root, resolved_cwd)
+    env = None
+    if 'env' in options:
+        env = os.environ.copy()
+        env.update({
+            k: resolve_variables(v, root, input_vars)
+            for k, v in options['env'].items()
+        })
     p = subprocess.Popen(
         ['bash', '--login'],
         stdin=subprocess.PIPE,
         cwd=cwd,
+        env=env,
         shell=task.get('type', 'process') == 'shell',
     )
     try:
@@ -90,6 +113,6 @@ def main(args=None):
 
     with timed(opts.time):
         for task_name in opts.tasks:
-            if run_task(tasks[task_name], root) != 0:
+            if run_task(tasks[task_name], root, opts.input_vars) != 0:
                 return 1
     return 0
