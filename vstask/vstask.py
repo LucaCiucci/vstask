@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import json
 import os
+import re
 import shlex
 import subprocess
 from .Timer import timed
@@ -24,12 +25,12 @@ def get_tasks():
             os.chdir('..')
 
         with open(os.path.join('.vscode', 'tasks.json')) as f:
-            tasks = json.loads(
-                '\n'.join(
-                    line for line in f.readlines()
-                    if not line.strip().startswith('//')
-                )
-            )['tasks']
+            content = f.read()
+            # Strip block comments
+            content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
+            # Strip line comments
+            content = re.sub(r'//[^\n]*', '', content)
+            tasks = json.loads(content)['tasks']
     except IOError:
         tasks = []
     except json.JSONDecodeError as e:
