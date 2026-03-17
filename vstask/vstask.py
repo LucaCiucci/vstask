@@ -26,9 +26,9 @@ def get_tasks():
 
         with open(os.path.join('.vscode', 'tasks.json')) as f:
             content = f.read()
-            # Strip block comments
+            # Strip block comments (/* ... */) including multi-line ones
             content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
-            # Strip line comments
+            # Strip line comments (// ...)
             content = re.sub(r'//[^\n]*', '', content)
             tasks = json.loads(content)['tasks']
     except IOError:
@@ -53,6 +53,10 @@ def resolve_variables(s, root, input_vars=None):
     if input_vars:
         for key, value in input_vars.items():
             s = s.replace('${input:' + key + '}', value)
+            s = s.replace('${' + key + '}', value)
+    unresolved = re.findall(r'\$\{[^}]+\}', s)
+    for var in unresolved:
+        print(f'Warning: unresolved variable {var!r} (use -i {var[2:-1]}=VALUE to set it)')
     return s
 
 
